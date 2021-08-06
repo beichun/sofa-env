@@ -50,6 +50,10 @@ def RigidObject(name="RigidObject",
     object = Sofa.Core.Node(name)
     if(parent != None):
         parent.addChild(object)
+    
+    if not isAStaticObject:
+        object.addObject('EulerImplicitSolver', name='odesolver')
+        object.addObject('CGLinearSolver', name='Solver')
 
     plugins = ['SofaRigid']
     object.addObject('MechanicalObject',

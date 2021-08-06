@@ -2,6 +2,8 @@
 import Sofa.Core
 from stlib3.visuals import VisualModel
 
+import meshio
+from scipy.spatial.transform import Rotation as R
 
 class ElasticMaterialObject(Sofa.Prefab):
     """Creates an object composed of an elastic material."""
@@ -45,15 +47,16 @@ class ElasticMaterialObject(Sofa.Prefab):
             Sofa.msg_error(self, "Unable to create an elastic object because there is no volume mesh provided.")
             return None
 
-        if self.volumeMeshFileName.value.endswith(".msh"):
-            self.loader = self.addObject('MeshGmshLoader', name='loader', filename=self.volumeMeshFileName.value, rotation=list(self.rotation.value), translation=list(self.translation.value), scale3d=list(self.scale.value))
-        elif self.volumeMeshFileName.value.endswith(".gidmsh"):
-            self.loader = self.addObject('GIDMeshLoader', name='loader', filename=self.volumeMeshFileName.value, rotation=list(self.rotation.value), translation=list(self.translation.value), scale3d=list(self.scale.value))
-        else:
-            self.loader = self.addObject('MeshVTKLoader', name='loader', filename=self.volumeMeshFileName.value, rotation=list(self.rotation.value), translation=list(self.translation.value), scale3d=list(self.scale.value))
-
-        self.container = self.addObject('TetrahedronSetTopologyContainer', src=self.loader.getLinkPath(), name='container')
-        self.dofs = self.addObject('MechanicalObject', template='Vec3', name='dofs')
+        mesh = meshio.read(self.volumeMeshFileName.value)
+        import numpy as np
+        points = mesh.points
+        # rotate
+        rot = R.from_euler('xyz', self.rotation.value, degrees=True)
+        points = rot.apply(points)
+        # translate
+        points += np.array(self.translation.value)
+        self.container = self.addObject('TetrahedronSetTopologyContainer', name='container', tetrahedra=mesh.cells_dict['tetra'].tolist())
+        self.dofs = self.addObject('MechanicalObject', template='Vec3', name='dofs', position=points.tolist())
 
         # To be properly simulated and to interact with gravity or inertia forces, an elasticobject
         # also needs a mass. You can add a given mass with a uniform distribution for an elasticobject

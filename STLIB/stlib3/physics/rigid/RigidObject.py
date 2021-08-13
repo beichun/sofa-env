@@ -91,7 +91,7 @@ def RigidObject(name="RigidObject",
 
     #### visualization
     def addVisualModel(inputMesh=surfaceMeshFileName):
-        visual = VisualModel(name="visual", visualMeshPath=inputMesh, color=color, scale=[uniformScale]*3)
+        visual = VisualModel(name="visual", visualMeshPath=inputMesh, color=color, scale=uniformScale)
         object.addChild(visual)
         visual.addObject('RigidMapping')
 

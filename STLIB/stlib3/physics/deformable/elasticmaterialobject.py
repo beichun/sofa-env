@@ -12,7 +12,7 @@ class ElasticMaterialObject(Sofa.Prefab):
         {'name':'name',                'type':'string', 'help':'Node name',                   'default':'ElasticMaterialObject'},
         {'name':'rotation',            'type':'Vec3d',  'help':'Rotation',                    'default':[0.0, 0.0, 0.0]},
         {'name':'translation',         'type':'Vec3d',  'help':'Translation',                 'default':[0.0, 0.0, 0.0]},
-        {'name':'scale',               'type':'Vec3d',  'help':'Scale 3d',                    'default':[1.0, 1.0, 1.0]},
+        {'name':'scale',               'type':'float',  'help':'Scale 3d',                    'default':[1.0, 1.0, 1.0]},
         {'name':'surfaceMeshFileName', 'type':'string', 'help':'Path to surface mesh file',   'default':''},
         {'name':'collisionMesh',       'type':'string', 'help':'Path to collision mesh file', 'default':''},
         {'name':'withConstrain',       'type':'bool',   'help':'Add constraint correction',   'default':True},
@@ -39,7 +39,7 @@ class ElasticMaterialObject(Sofa.Prefab):
             plugins.append('SofaImplicitOdeSolver')
             self.integration = self.addObject('EulerImplicitSolver', name='integration')
             plugins.append('SofaSparseSolver')
-            self.solver = self.addObject('SparseLDLSolver', name="solver")
+            self.solver = self.addObject('SparseLDLSolver', name="solver", template="CompressedRowSparseMatrixd")
             # Eulalie: 01/21 a bit hard to debug... when uncommented, no warning or error shows up, yet all components won't just be created...
             # self.solverName = 'solver'
 
@@ -75,12 +75,15 @@ class ElasticMaterialObject(Sofa.Prefab):
         if self.withConstrain:
             plugins.append('SofaConstraint')
             self.correction = self.addObject('LinearSolverConstraintCorrection',name='correction')
+            # self.correction = self.addObject('UncoupledConstraintCorrection',name='correction')
+            # self.correction = self.addObject('GenericConstraintCorrection',name='correction')
 
+        scale_list = [self.scale.value, self.scale.value, self.scale.value]
         if self.collisionMesh:
-            self.addCollisionModel(self.collisionMesh.value, list(self.rotation.value), list(self.translation.value), list(self.scale.value))
+            self.addCollisionModel(self.collisionMesh.value, list(self.rotation.value), list(self.translation.value), scale_list)
 
         if self.surfaceMeshFileName:
-            self.addVisualModel(self.surfaceMeshFileName.value, list(self.surfaceColor.value), list(self.rotation.value), list(self.translation.value), list(self.scale.value))
+            self.addVisualModel(self.surfaceMeshFileName.value, list(self.surfaceColor.value), list(self.rotation.value), list(self.translation.value), self.scale.value)
 
         self.addObject('RequiredPlugin', pluginName=plugins)
 
@@ -95,7 +98,7 @@ class ElasticMaterialObject(Sofa.Prefab):
         self.collisionmodel.addObject('PointCollisionModel')
         self.collisionmodel.addObject('BarycentricMapping')
 
-    def addVisualModel(self, filename, color, rotation, translation, scale=[1., 1., 1.]):
+    def addVisualModel(self, filename, color, rotation, translation, scale=1.):
         visualmodel = self.addChild(VisualModel(visualMeshPath=filename, color=color, rotation=rotation, translation=translation, scale=scale))
 
         # Add a BarycentricMapping to deform the rendering model to follow the ones of the

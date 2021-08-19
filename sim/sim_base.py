@@ -31,13 +31,15 @@ class SimBase(ABC):
                                         [wksp_center[1]-r, wksp_center[1]+r],
                                         [wksp_center[2]-r, wksp_center[2]+r]])
         
-        self._gripper_home_position = np.array([-0.2, 0, 0.3])
+        self._gripper_home_position = np.array([-0., 0, 0.3])
+        self._success_height = self._gripper_home_position[-1] - 0.1
         # observation
         self._voxel_size = 0.002
         self._heightmap_pix_size = self._voxel_size
         
         self._object_list = []
         self._gripper = None
+        
         
     @abstractmethod
     def reset(self):
@@ -55,6 +57,9 @@ class SimBase(ABC):
     def get_gt_action(self):
         pass
     
+    def get_cam_data(self):
+        pass
+        
     def get_observation(self, gui):
         print(gui)
     
@@ -100,11 +105,13 @@ class SimBase(ABC):
             # pose
             x = np.random.rand() * np.diff(self.position_bound[0])[0] + self.position_bound[0, 0]
             y = np.random.rand() * np.diff(self.position_bound[1])[0] + self.position_bound[1, 0]
-            position = [x, y, 0.15*(i+1)]
+            x, y = 0.1, 0.1
+            position = [x, y, 0.08*(i+1)]
             orientation = self._bullet_client.getQuaternionFromEuler(2 * np.pi * np.random.rand(3))
             colors = utils.get_tableau_palette(True)
             color = colors[np.random.choice(len(colors))]
             object_list.append({
+                'name': f'Object{i}',
                 'object_category': object_category,
                 'id': selected_id,
                 'object_dir': object_dir,

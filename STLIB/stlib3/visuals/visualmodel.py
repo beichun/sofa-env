@@ -19,7 +19,7 @@ class VisualModel(Sofa.Prefab):
         self.addObject('RequiredPlugin', pluginName=['SofaOpenglVisual','SofaLoader'])
         path = self.visualMeshPath.value
         if path.endswith('.stl'):
-            self.addObject('MeshSTLLoader', name='loader',filename=path)
+            self.addObject('MeshSTLLoader', name='loader',filename=path, scale=self.scale.value)
         elif path.endswith('.obj'):
             self.addObject('MeshObjLoader', name='loader',filename=path, scale=self.scale.value)
         else:

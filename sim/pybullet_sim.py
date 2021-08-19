@@ -5,6 +5,7 @@ import pybullet_data
 import pybullet_utils.bullet_client as bc
 
 from sim.sim_base import SimBase
+from gripper_module import ArticulatedGripper
 import utils
 
 class PybulletSim(SimBase):
@@ -32,8 +33,7 @@ class PybulletSim(SimBase):
               object_category,
               object_id=None,
               object_size='random',
-              size_lower=0.8,
-              size_upper=1.):
+              gripper_size=1.):
         # remove outdated obejcts and gripper
         for obj_id in self._object_list:
             self._bullet_client.removeBody(obj_id)
@@ -51,7 +51,7 @@ class PybulletSim(SimBase):
             self._object_list.append(object_id)
         
         # load gripper
-        
+        ArticulatedGripper(self._gripper_home_position, gripper_size)
         
         
     
@@ -74,6 +74,7 @@ class PybulletSim(SimBase):
                              visual_mesh=object_info['visual_mesh'],
                              collision_mesh=object_info['collision_mesh'],
                              color=object_info['color'])
+        return obj
     
     def stepSimulation(self, n_step=1):
         for i in range(n_step):

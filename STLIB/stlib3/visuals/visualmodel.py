@@ -25,7 +25,6 @@ class VisualModel(Sofa.Prefab):
         else:
             print("Extension not handled in STLIB/python3/stlib3/visuals for file: "+str(path))
 
-        # print(self.scale.value)
         self.addObject('OglModel', name="OglModel", src="@loader",
                                                     rotation=list(self.rotation.value),
                                                     translation=list(self.translation.value),

@@ -47,16 +47,22 @@ class ElasticMaterialObject(Sofa.Prefab):
             Sofa.msg_error(self, "Unable to create an elastic object because there is no volume mesh provided.")
             return None
 
-        mesh = meshio.read(self.volumeMeshFileName.value)
-        import numpy as np
-        points = mesh.points
-        # rotate
-        rot = R.from_euler('xyz', self.rotation.value, degrees=True)
-        points = rot.apply(points)
-        # translate
-        points += np.array(self.translation.value)
-        self.container = self.addObject('TetrahedronSetTopologyContainer', name='container', tetrahedra=mesh.cells_dict['tetra'].tolist())
-        self.dofs = self.addObject('MechanicalObject', template='Vec3', name='dofs', position=points.tolist())
+        scale_list = [self.scale.value, self.scale.value, self.scale.value]
+        if self.volumeMeshFileName.value.endswith(".msh"):
+            self.loader = self.addObject('MeshGmshLoader', name='loader', filename=self.volumeMeshFileName.value, rotation=list(self.rotation.value), translation=list(self.translation.value), scale3d=scale_list)
+            self.container = self.addObject('TetrahedronSetTopologyContainer', src='@loader', name='container')
+            self.dofs = self.addObject('MechanicalObject', template='Vec3d', name='dofs')
+        else:
+            mesh = meshio.read(self.volumeMeshFileName.value)
+            import numpy as np
+            points = mesh.points
+            # rotate
+            rot = R.from_euler('xyz', self.rotation.value, degrees=True)
+            points = rot.apply(points)
+            # translate
+            points += np.array(self.translation.value)
+            self.container = self.addObject('TetrahedronSetTopologyContainer', name='container', tetrahedra=mesh.cells_dict['tetra'].tolist())
+            self.dofs = self.addObject('MechanicalObject', template='Vec3', name='dofs', position=points.tolist())
 
         # To be properly simulated and to interact with gravity or inertia forces, an elasticobject
         # also needs a mass. You can add a given mass with a uniform distribution for an elasticobject
@@ -78,7 +84,6 @@ class ElasticMaterialObject(Sofa.Prefab):
             # self.correction = self.addObject('UncoupledConstraintCorrection',name='correction')
             # self.correction = self.addObject('GenericConstraintCorrection',name='correction')
 
-        scale_list = [self.scale.value, self.scale.value, self.scale.value]
         if self.collisionMesh:
             self.addCollisionModel(self.collisionMesh.value, list(self.rotation.value), list(self.translation.value), scale_list)
 

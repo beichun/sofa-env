@@ -1,2 +1,2 @@
-from gripper_module.cable_gripper import CableGripper
-from gripper_module.articulated_gripper import ArticulatedGripper
+from gripper_module.CableGripper import CableGripper
+from gripper_module.ArticulatedGripper import ArticulatedGripper

@@ -7,7 +7,11 @@ class GripperBase(ABC):
         self._gripper_size = gripper_size
     
     @abstractmethod
-    def sample_joint(self):
+    def get_name(self):
+        pass
+    
+    @abstractmethod
+    def get_joint_limit(self):
         pass
     
     @abstractmethod
@@ -16,6 +20,14 @@ class GripperBase(ABC):
     
     @abstractmethod
     def step_joints(self):
+        pass
+    
+    @abstractmethod
+    def reset_home(self):
+        pass
+    
+    @abstractmethod
+    def up(self):
         pass
     
     @abstractmethod

@@ -15,9 +15,9 @@ from stlib3.physics.rigid import Floor, Cube, Sphere, RigidObject
 
 import sim.utils as utils
 from sim.fusion import TSDFVolume, tsdf2mesh
-from gripper_module import CableGripper, ArticulatedGripper
+from gripper_module import CableGripper, ArticulatedGripper, parse_gripper_id
 
-class SimAll(object):
+class Sim(object):
     def __init__(self, gui_enabled=False):
         self._gui_enabled = gui_enabled
         
@@ -53,9 +53,9 @@ class SimAll(object):
         # observation
         self._voxel_size = 0.002
         self._heightmap_pix_size = self._voxel_size
-        self._tsdf_bounds = np.array([[-0.2, 0.2], # 3x2 rows: x,y,z cols: min,max
-                                      [-0.2, 0.2],
-                                      [ 0.0, 0.2]])
+        self._tsdf_bounds = np.array([[-0.24, 0.24], # 3x2 rows: x,y,z cols: min,max
+                                      [-0.24, 0.24],
+                                      [ 0.0, 0.24]])
         self._cam_lookat = self._tsdf_bounds.mean(axis=1)
         self._cam_image_size = (512, 512)
         self._cam_z_near = 0.01
@@ -107,8 +107,7 @@ class SimAll(object):
               object_category,
               object_id=None,
               object_size='random',
-              gripper_type='cg',
-              gripper_name=None,
+              gripper_id=None,
               gripper_size=1.,
               **gripper_kwargs):
         # remove outdated obejcts and gripper
@@ -123,8 +122,7 @@ class SimAll(object):
         # get objects
         generated_objects = self.generate_objects(n_object, object_category, object_size=object_size, size_lower=0.8, size_upper=1.)
         
-        if isinstance(gripper_type, list):
-            gripper_type = np.random.choice(gripper_type)
+        gripper_type, gripper_name = parse_gripper_id(gripper_id)
         sofa_gripper_types = ['cg']
         pybullet_gripper_types = ['articulated']
         if gripper_type in sofa_gripper_types:
@@ -153,14 +151,14 @@ class SimAll(object):
             return max(z, 0)
         observation = {
             'scene_init_pc': scene_observation['pc'],
+            'scene_init_tsdf': scene_observation['tsdf'],
             'object_bbox': scene_observation['bbox'],
             'get_z': partial(get_z,
                              tsdf_bounds=self._tsdf_bounds,
                              heightmap_pix_size=self._heightmap_pix_size,
                              grasp_offset=self._grasp_offset,
                              depth_heightmap=self.get_scene_heightmap()[1]),
-            'gripper_type': gripper_type,
-            'gripper_name': self._gripper.get_name(),
+            'gripper_id': gripper_id,
             'gripper_joint_limit': self._gripper.get_joint_limit()
         }
         return observation
@@ -192,32 +190,48 @@ class SimAll(object):
         
         if record:
             # 1. move objects away
-            object_init_states = self.set_object_states()
+            object_init_states = self.get_object_states()
+            self.set_object_states()
+            print(object_init_states)
             
             # 2. step gripper, get target
-            self._gripper.step_pose(pose, v=0.5)
+            self._gripper.step_pose(pose)
+            if self._sofa_backend:
+                self.sofa2pybullet()
+            obs = self.get_gripper_observation()
+            observation['gripper_init_pc'] = obs['pc']
+            observation['gripper_init_tsdf'] = obs['tsdf']
+            observation['action_init'] = self._gripper.get_joint_states()
+            observation['action_target'] = joints
+            
             self._gripper.step_joints(joints)
+            # if self._sofa_backend:
+            #     self.sofa2pybullet()
             obs = self.get_gripper_observation()
             observation['gripper_target_pc'] = obs['pc']
+            observation['gripper_target_tsdf'] = obs['tsdf']
             
             # 3. move gripper to home position
-            self._gripper.reset_home()
+            self._gripper.reset()
             self.set_object_states(object_init_states)
             
         # 4. step gripper pose, get gripper init
         self._gripper.step_pose(pose)
-        if record:
-            obs = self.get_gripper_observation()
-            observation['gripper_init_pc'] = obs['pc']
             
         # 5. step gripper joints, get gripper final and scene final
         self._gripper.step_joints(joints)
         if record:
+            if self._sofa_backend:
+                self.sofa2pybullet()
             obs = self.get_gripper_observation()
             observation['gripper_final_pc'] = obs['pc']
+            observation['gripper_final_tsdf'] = obs['tsdf']
             obs = self.get_scene_observation()
             observation['scene_final_pc'] = obs['pc']
+            observation['scene_final_tsdf'] = obs['tsdf']
             
+            # additional information
+            observation['action_final'] = self._gripper.get_joint_states()
         # 6. move up gripper, get reward
         self._gripper.up()
         reward = (sum(self.get_reward())>=1)*1
@@ -313,11 +327,11 @@ class SimAll(object):
         for i in range(len(objects)):
             object_info = objects[i]
             xyz = [i*self._unit_scale for i in object_info['xyz']]
-            rot = self._bullet_client.getEulerFromQuaternion(object_info['quat'])
+            # rot = self._bullet_client.getEulerFromQuaternion(object_info['quat'])
             object_node = RigidObject(object_info['name'],
                                     surfaceMeshFileName=object_info['collision_mesh'],
                                     translation=xyz*self._unit_scale,
-                                    rotation=rot,
+                                    rotation=list(object_info['euler']),
                                     uniformScale=object_info['scale']*self._unit_scale,
                                     totalMass=0.02,
                                     volume=20.,
@@ -325,6 +339,7 @@ class SimAll(object):
                                     color=object_info['color'],
                                     isAStaticObject=False,
                                     parent=object_parent)
+            object_node.dt = 0.002
             self._sofa_object_list.append(object_node)
         self._n_object = len(objects)
         # in pybullet
@@ -363,14 +378,36 @@ class SimAll(object):
             Sofa.Simulation.initVisual(self._sofa_root)
             Sofa.Simulation.initTextures(self._sofa_root)
         
-        for i in range(2*240):
+        for i in range(240):
             self.stepSim()
         
         self.sofa2pybullet()
         
     
     def load_pybullet(self, objects, gripper_type, gripper_name, gripper_size, **gripper_kwargs):
-        raise NotImplementedError()
+        assert self._bullet_client.getNumBodies()==1
+        # load objects
+        for object_info in objects:
+            object_id = self.load_object(object_info)
+            self._pybullet_object_list.append(object_id)
+        self._n_object = len(objects)
+        
+        def stepSimulation(bullet_client, n_step=1):
+            for _ in range(n_step):
+                bullet_client.stepSimulation()
+                time.sleep(0.005) # TODO:
+        self.stepSim = partial(stepSimulation,
+                                bullet_client=self._bullet_client)
+        for i in range(240):
+            self.stepSim()
+        
+        # load gripper
+        self._gripper = ArticulatedGripper(self._bullet_client,
+                           self._gripper_home_position,
+                           gripper_size,
+                           gripper_name,
+                           )
+        self._gripper_id = self._gripper.get_id()
         
     def generate_objects(self,
                          n_object,
@@ -401,7 +438,7 @@ class SimAll(object):
                 elif object_category=='primitive':
                     visual_mesh = os.path.join(object_dir, 'tinker.obj')
                     collision_mesh = visual_mesh
-                    initial_scale = 0.0008
+                    initial_scale = 0.0005
             else:
                 selected_id = object_id
             # size
@@ -413,9 +450,9 @@ class SimAll(object):
             # pose
             x = np.random.rand() * np.diff(self._object_bound[0])[0] + self._object_bound[0, 0]
             y = np.random.rand() * np.diff(self._object_bound[1])[0] + self._object_bound[1, 0]
-            x, y = 0.1, 0.1
             position = [x, y, 0.1*(i+1)]
-            orientation = self._bullet_client.getQuaternionFromEuler(2 * np.pi * np.random.rand(3))
+            euler = 2 * np.pi * np.random.rand(3)
+            quat = self._bullet_client.getQuaternionFromEuler(euler)
             colors = utils.get_tableau_palette(True)
             color = colors[np.random.choice(len(colors))]
             object_list.append({
@@ -427,7 +464,8 @@ class SimAll(object):
                 'collision_mesh': collision_mesh,
                 'scale': generated_size,
                 'xyz': position,
-                'quat': orientation,
+                'quat': quat,
+                'euler': euler,
                 'color': color
             })
             
@@ -553,6 +591,8 @@ class SimAll(object):
         for i in range(len(gripper_colors)):
             self._bullet_client.changeVisualShape(self._gripper_id, gripper_colors[i][0], rgbaColor=[0,0,0,0])
         scene_tsdf = self.get_tsdf()
+        # tsdf_vol_cpu, _ = scene_tsdf.get_volume()
+        # tsdf_vol_cpu = np.transpose(tsdf_vol_cpu, [1, 0, 2]) # swap x-axis and y-axis to make it consitent with scene_tsdf
         scene_pc, scene_mesh = scene_tsdf.get_point_cloud_sample(n_point, skip_z=3, upward_only=True, get_mesh=True)
         
         # Make gripper opaque again
@@ -562,6 +602,7 @@ class SimAll(object):
         bbox_max = np.max(scene_pc[:, :2], axis=0)
         return {
             'pc': scene_pc,
+            'tsdf': scene_tsdf,
             'bbox': np.stack([bbox_min, bbox_max], axis=0)
         }
     
@@ -571,12 +612,15 @@ class SimAll(object):
         for object_body_id in self._pybullet_object_list:
             self._bullet_client.changeVisualShape(object_body_id, -1, rgbaColor=[0,0,0,0])
         gripper_tsdf = self.get_tsdf()
+        # tsdf_vol_cpu, _ = gripper_tsdf.get_volume()
+        # tsdf_vol_cpu = np.transpose(tsdf_vol_cpu, [1, 0, 2]) # swap x-axis and y-axis to make it consitent with scene_tsdf
         gripper_pc, scene_mesh = gripper_tsdf.get_point_cloud_sample(n_point, skip_z=3, upward_only=True, get_mesh=True)
         # Make object opaque again
         for i in range(len(object_colors)):
             self._bullet_client.changeVisualShape(self._pybullet_object_list[i], object_colors[i][1], rgbaColor=object_colors[i][7])
         return {
-            'pc': gripper_pc
+            'pc': gripper_pc,
+            'tsdf': gripper_tsdf
         }
     
     def get_object_states(self):
@@ -584,27 +628,32 @@ class SimAll(object):
         for i in range(self._n_object):
             if self._sofa_backend:
                 state = self._sofa_object_list[i].mstate.position.value[0]
-                pos = state[:3]/self._unit_scale
-                quat = state[3:]
+                pos = (state[:3]/self._unit_scale).tolist()
+                quat = state[3:].tolist()
             else:
                 state = self._bullet_client.getBasePositionAndOrientation(self._pybullet_object_list[i])
                 pos = state[0]
                 quat = state[1]
             object_states.append((pos, quat))
+        return object_states
     
     def set_object_states(self, object_states=None):
         if object_states is None:
             object_states = [([1+i, 0, 0.1], [0., 0., 0., 1.]) for i in range(self._n_object)]
+
         for i in range(self._n_object):
             state = object_states[i]
             if self._sofa_backend:
                 x, y, z = state[0]
-                self._sofa_object_list[i].mstate.position = [[i*self._unit_scale for i in state[0]] + state[1]]
+                sofa_pos = [x*self._unit_scale, y*self._unit_scale, z*self._unit_scale]
+                quat = state[1]
+                print('set', [sofa_pos + quat])
+                self._sofa_object_list[i].mstate.position = [sofa_pos + quat]
             else:
                 self._bullet_client.resetBasePositionAndOrientation(self._pybullet_object_list[i], state[0], state[1])
-        if self._sofa_backend:
-            self.sofa2pybullet()
-    
+        # if self._sofa_backend:
+        #     self.sofa2pybullet()
+
     def runSofa(self):
         # run sofa's own gui
         Sofa.Gui.GUIManager.Init("myscene", "qt")

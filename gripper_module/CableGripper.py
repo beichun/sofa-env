@@ -14,9 +14,9 @@ class CableGripper(GripperBase):
     def __init__(self,
                  home_position,
                  gripper_size,
-                 gripper_name=None,
-                 n_fingers=3,
-                 long_finger=True,
+                 gripper_name,
+                #  n_fingers=3,
+                #  long_finger=True,
                  poissonRatio=0.3,
                  youngModulus=10000,
                  gripper_root=None,
@@ -24,26 +24,8 @@ class CableGripper(GripperBase):
                  unit_scale=1000):
         super().__init__(home_position, gripper_size)
         
-        # parse gripper name
-        if gripper_name is None:
-            self._n_fingers = np.random.choice([2, 3, 4])
-            self._long_finger = np.random.choice([True, False])
-            self._gripper_name = f'{self._n_fingers}f-{"long" if self._lonng_finger else "short"}'
-        else:
-            self._gripper_name = gripper_name
-            gripper_char = self._gripper_name.split('-')
-            n_fingers = int(gripper_char[0][0])
-            if n_fingers in [2, 3, 4]:
-                self._n_fingers = n_fingers
-            else:
-                raise NotImplementedError(f'{n_fingers}-finger cable gripper not implemented.')
-            if gripper_char[1]=='long':
-                self._long_finger = True
-            elif gripper_char[1]=='short':
-                self._long_finger = False
-            else:
-                raise NotImplementedError(f'Unknown gripper finger type: {gripper_char[1]}.')
-
+        self.parse_name(gripper_name)
+        
         self._unit_scale = unit_scale
         if gripper_root is None:
             self._root = Sofa.Core.Node("Gripper")
@@ -73,6 +55,21 @@ class CableGripper(GripperBase):
         self._joint_limit_upper = self._constraint_limit * np.ones(self._n_fingers)
         self._joint_limit_lower = np.zeros(self._n_fingers)
     
+    def parse_name(self, gripper_name):
+        self._gripper_name = gripper_name
+        gripper_char = self._gripper_name.split('_')
+        n_fingers = int(gripper_char[0][0])
+        if n_fingers in [2, 3, 4]:
+            self._n_fingers = n_fingers
+        else:
+            raise NotImplementedError(f'{n_fingers}-finger cable gripper not implemented.')
+        if gripper_char[1]=='long':
+            self._long_finger = True
+        elif gripper_char[1]=='short':
+            self._long_finger = False
+        else:
+            raise NotImplementedError(f'Unknown gripper finger type: {gripper_char[1]}.')
+
     def load_gripper(self):
         if self._long_finger:
             finger_vol = "assets/mesh/finger.vtk"
@@ -223,9 +220,10 @@ class CableGripper(GripperBase):
     #     # up
     #     self.step_pose([pos_x, pos_y, self._home_position[2], angle])
         
-    def reset_home(self, v=1.):
+    def reset(self, v=1.):
         self.move(self._home_position, v=v)
         self.rotate(0)
+        self.step_joints(self._joint_limit_lower)
         
     def step_pose(self, pose, v=.5):
         pos_x, pos_y, pos_z, angle = pose
@@ -242,7 +240,9 @@ class CableGripper(GripperBase):
         assert len(target_states)==self._joint_dof
         
         current_states = self.get_joint_states()
-        n_step = int( (target_states-current_states).max()//v )
+        if np.all(np.abs(target_states-current_states)<=1e-5):
+            return
+        n_step = int( np.abs(target_states-current_states).max()//v )
         trajectory = np.linspace(self._current_rot, target_states, n_step+1)
         for i in range(n_step):
             for j, finger in enumerate(self._fingers):
@@ -283,8 +283,8 @@ class CableGripper(GripperBase):
         target_rot = target_rot%(2*np.pi)
         if self._current_rot==target_rot:
             return
-        n_step = int( (target_rot-self._current_rot)//v + 1 )
-        trajectory = np.linspace(self._current_rot, target_rot, n_step)
+        n_step = int( np.abs(target_rot-self._current_rot)//v )
+        trajectory = np.linspace(self._current_rot, target_rot, n_step+1)
         
         finger_points = []
         pull_points = []
@@ -292,7 +292,7 @@ class CableGripper(GripperBase):
             finger_points.append(finger.ElasticMO.dofs.rest_position.value.copy())
             pull_points.append(finger.ElasticMO.PullingCable.CableConstraint.pullPoint.value.copy())
             
-        for i in range(n_step-1):
+        for i in range(n_step):
             angle = trajectory[i+1] - trajectory[0]
             for j, finger in enumerate(self._fingers):
                 finger.ElasticMO.dofs.rest_position = rotate_around_z(finger_points[j], angle).tolist()
@@ -306,15 +306,15 @@ class CableGripper(GripperBase):
         if distance<=1e-5:
             return
         direction = (target_pos - self._current_pos)/distance
-        n_step = int( distance//v + 1 )
-        trajectory = np.linspace(0, distance, n_step)
+        n_step = int( distance//v )
+        trajectory = np.linspace(0, distance, n_step+1)
 
         finger_points = []
         pull_points = []
         for finger in self._fingers:
             finger_points.append(finger.ElasticMO.dofs.rest_position.value.copy())
             pull_points.append(finger.ElasticMO.PullingCable.CableConstraint.pullPoint.value.copy())
-        for i in range(n_step-1):
+        for i in range(n_step):
             distance_i = trajectory[i+1] - trajectory[0]
             for j, finger in enumerate(self._fingers):
                 finger.ElasticMO.dofs.rest_position = translate_along_v(finger_points[j], direction, distance_i).tolist()
@@ -332,8 +332,8 @@ class CableGripper(GripperBase):
     def set_root(self, root):
         root.addChild(self._root)
     
-    def get_name(self):
-        return self._gripper_name
+    # def get_name(self):
+    #     return self._gripper_name
     
 def rotate_around_z(points, angle):
     points = np.array(points)

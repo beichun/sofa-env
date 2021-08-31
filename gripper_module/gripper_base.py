@@ -6,9 +6,8 @@ class GripperBase(ABC):
         self._home_position = home_position
         self._gripper_size = gripper_size
     
-    @abstractmethod
     def get_name(self):
-        pass
+        return self._gripper_name
     
     @abstractmethod
     def get_joint_limit(self):
@@ -23,7 +22,7 @@ class GripperBase(ABC):
         pass
     
     @abstractmethod
-    def reset_home(self):
+    def reset(self):
         pass
     
     @abstractmethod

@@ -9,3 +9,11 @@ __pycache__/
 # sofa
 *.log
 *.ini
+
+*.obj
+*.urdf
+*.mtl
+*.json
+*.txt
+
+data/

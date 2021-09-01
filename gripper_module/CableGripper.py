@@ -235,7 +235,7 @@ class CableGripper(GripperBase):
             self.stepSimulation()
     
     
-    def step_joints(self, target_states, v=1.):
+    def step_joints(self, target_states, v=.5):
         target_states = np.array(target_states)
         assert len(target_states)==self._joint_dof
         
@@ -261,8 +261,6 @@ class CableGripper(GripperBase):
         target_pos = [current_pos[0], current_pos[1], z]
         self.move(target_pos, v=v)
         
-    def open(self):
-        pass
         
     def close(self, cable_step=1):
         is_closed = False

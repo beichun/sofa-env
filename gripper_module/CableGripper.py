@@ -35,10 +35,10 @@ class CableGripper(GripperBase):
         self._gripper_category = 'cablegripper'
         
         if self._long_finger:
-            self._position_offset = np.array([0, 0, 100.])*self._gripper_size
+            self._position_offset = np.array([0, 0, 105.])*self._gripper_size
         else:
+            # self._gripper_size *= 2
             self._position_offset = np.array([0, 0, 70.])*self._gripper_size
-            self._gripper_size *= 2
             
         # physical property
         self._poissonRatio = poissonRatio
@@ -155,8 +155,6 @@ class CableGripper(GripperBase):
                 self.load_finger(rotation, translation, fixingBox, pullPointLocation, 'Finger4', finger_vol, finger_mesh, cable_file)
             )
 
-            
-        
         # vis_pts = np.array([
         #             [45, 0],
         #             [-45, 20],
@@ -225,7 +223,7 @@ class CableGripper(GripperBase):
         self.rotate(0)
         self.step_joints(self._joint_limit_lower)
         
-    def step_pose(self, pose, v=.5):
+    def step_pose(self, pose, v=1.):
         pos_x, pos_y, pos_z, angle = pose
         pos_x, pos_y, pos_z = pos_x*self._unit_scale, pos_y*self._unit_scale, pos_z*self._unit_scale
         self.rotate(angle, np.pi/180)

@@ -192,8 +192,8 @@ class Sim(object):
         
         if record:
             # 4. move objects away
-            self._gripper.reset()
             self.set_object_states()
+            self._gripper.reset()
             
             # 5. step gripper pose, get init
             self._gripper.step_pose(pose)
@@ -281,7 +281,7 @@ class Sim(object):
                                                         name='Response', response='FrictionContact')
         self._sofa_root.addObject('LocalMinDistance',
                         alarmDistance=4, contactDistance=3,
-                        angleCone=0.01)
+                        angleCone=0.01, printLog=False)
         # animation
         self._sofa_root.addObject('FreeMotionAnimationLoop')
         self._sofa_root.addObject('GenericConstraintSolver', tolerance=1e-9, maxIterations=1000)

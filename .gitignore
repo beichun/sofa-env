@@ -10,8 +10,9 @@ __pycache__/
 *.log
 *.ini
 
-*.obj
-*.urdf
+# *.obj
+assets/object/3dnet
+# *.urdf
 *.mtl
 *.json
 *.txt

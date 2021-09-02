@@ -11,6 +11,7 @@ import pybullet_utils.bullet_client as bc
 
 import SofaRuntime
 import Sofa
+import Sofa.Gui
 from stlib3.physics.rigid import Floor, Cube, Sphere, RigidObject
 
 import sim.utils as utils
@@ -108,8 +109,7 @@ class Sim(object):
               object_id=None,
               object_size='random',
               gripper_id=None,
-              gripper_size=1.,
-              **gripper_kwargs):
+              gripper_size=1.):
         # remove outdated obejcts and gripper
         for object_id in self._pybullet_object_list:
             self._bullet_client.removeBody(object_id)
@@ -132,9 +132,9 @@ class Sim(object):
             
         # load objects and gripper
         if self._sofa_backend:
-            self.load_sofa(generated_objects, gripper_type, gripper_name, gripper_size, **gripper_kwargs)
+            self.load_sofa(generated_objects, gripper_type, gripper_name, gripper_size)
         else:
-            self.load_pybullet(generated_objects, gripper_type, gripper_name, gripper_size, **gripper_kwargs)
+            self.load_pybullet(generated_objects, gripper_type, gripper_name, gripper_size)
         
         # get object observation
         scene_observation = self.get_scene_observation()
@@ -162,62 +162,17 @@ class Sim(object):
             'gripper_joint_limit': self._gripper.get_joint_limit()
         }
         return observation
-        # np.savetxt(f'scene0.xyz', scene_observation['scene_pc'])
-        # # get gripper observation
-        # object_state = self.get_object_states()
-        # self.set_object_states()
-        # xy = scene_observation['object_bbox'].mean(0)
-        # x, y = xy[0], xy[1]
-        # z = self.get_grasp_height(x, y)
-        # self._gripper.step_pose([x, y, z, 0])
-        # gripper_observation = self.get_gripper_observation()
-        # self._gripper.reset()
-        # self.set_object_states(object_state)
-        # scene_observation = self.get_scene_observation()
-        # np.savetxt(f'scene1.xyz', scene_observation['scene_pc'])
-        # return {**scene_observation, **gripper_observation}
-
-    # def sample_action(self, sample_xy=True, sample_joint_range=1.):
-    #     # sample pose
-    #     pose = 0
-        
-    #     # sample joints
-    #     joints = self._gripper.sample_joint(sample_joint_range)
-    #     return pose, joints
-        
+    
     def step(self, pose, joints, record=False):
         observation = dict()
         
         if record:
-            # 1. move objects away
             object_init_states = self.get_object_states()
-            self.set_object_states()
-            
-            # 2. step gripper, get target
-            self._gripper.step_pose(pose)
-            if self._sofa_backend:
-                self.sofa2pybullet()
-            obs = self.get_gripper_observation()
-            observation['gripper_init_pc'] = obs['pc']
-            observation['gripper_init_tsdf'] = obs['tsdf']
-            observation['action_init'] = self._gripper.get_joint_states()
-            observation['action_target'] = joints
-            
-            self._gripper.step_joints(joints)
-            # if self._sofa_backend:
-            #     self.sofa2pybullet()
-            obs = self.get_gripper_observation()
-            observation['gripper_target_pc'] = obs['pc']
-            observation['gripper_target_tsdf'] = obs['tsdf']
-            
-            # 3. move gripper to home position
-            self._gripper.reset()
-            self.set_object_states(object_init_states)
-            
-        # 4. step gripper pose, get gripper init
+        
+        # 1. step gripper pose
         self._gripper.step_pose(pose)
             
-        # 5. step gripper joints, get gripper final and scene final
+        # 2. step gripper joints, get gripper final and scene final
         self._gripper.step_joints(joints)
         if record:
             if self._sofa_backend:
@@ -228,12 +183,35 @@ class Sim(object):
             obs = self.get_scene_observation()
             observation['scene_final_pc'] = obs['pc']
             observation['scene_final_tsdf'] = obs['tsdf']
-            
             # additional information
             observation['action_final'] = self._gripper.get_joint_states()
-        # 6. move up gripper, get reward
+        # 3. move up gripper, get reward
         self._gripper.up()
         reward = (sum(self.get_reward())>=1)*1
+        
+        
+        if record:
+            # 4. move objects away
+            self._gripper.reset()
+            self.set_object_states()
+            
+            # 5. step gripper pose, get init
+            self._gripper.step_pose(pose)
+            if self._sofa_backend:
+                self.sofa2pybullet()
+            obs = self.get_gripper_observation()
+            observation['gripper_init_pc'] = obs['pc']
+            observation['gripper_init_tsdf'] = obs['tsdf']
+            observation['action_init'] = self._gripper.get_joint_states()
+            observation['action_target'] = joints
+            
+            # 6. step gripper joints, get target
+            self._gripper.step_joints(joints)
+            if self._sofa_backend:
+                self.sofa2pybullet()
+            obs = self.get_gripper_observation()
+            observation['gripper_target_pc'] = obs['pc']
+            observation['gripper_target_tsdf'] = obs['tsdf']        
         
         return reward, observation
         
@@ -277,11 +255,12 @@ class Sim(object):
         # return actions
     
     
-    def load_sofa(self, objects, gripper_type, gripper_name, gripper_size, **gripper_kwargs):
+    def load_sofa(self, objects, gripper_type, gripper_name, gripper_size):
         self._sofa_root = Sofa.Core.Node("root")
         
         # create sofa graph
-        self._sofa_root.addObject('VisualStyle', displayFlags="showVisualModels showBehaviorModels showInteractions")
+        # showVisualModels showInteractions showBehavior
+        self._sofa_root.addObject('VisualStyle', displayFlags="showInteractions")
         self._sofa_root.addObject("OglGrid", name="grid", plane="z", nbSubdiv=10, size=1000, draw=True)
         self._sofa_root.addObject("LightManager")
         self._sofa_root.addObject("DirectionalLight", direction=[0,1,1], shadowsEnabled=True)
@@ -326,7 +305,6 @@ class Sim(object):
         for i in range(len(objects)):
             object_info = objects[i]
             xyz = [i*self._unit_scale for i in object_info['xyz']]
-            # rot = self._bullet_client.getEulerFromQuaternion(object_info['quat'])
             object_node = RigidObject(object_info['name'],
                                     surfaceMeshFileName=object_info['collision_mesh'],
                                     translation=xyz*self._unit_scale,
@@ -383,7 +361,7 @@ class Sim(object):
         self.sofa2pybullet()
         
     
-    def load_pybullet(self, objects, gripper_type, gripper_name, gripper_size, **gripper_kwargs):
+    def load_pybullet(self, objects, gripper_type, gripper_name, gripper_size):
         assert self._bullet_client.getNumBodies()==1
         # load objects
         for object_info in objects:
@@ -394,7 +372,7 @@ class Sim(object):
         def stepSimulation(bullet_client, n_step=1):
             for _ in range(n_step):
                 bullet_client.stepSimulation()
-                time.sleep(0.005) # TODO:
+                # time.sleep(0.005)
         self.stepSim = partial(stepSimulation,
                                 bullet_client=self._bullet_client)
         for i in range(240):
@@ -579,8 +557,8 @@ class Sim(object):
         color_image, depth_image, _, cam_pose_matrix = self.get_cam_data(cam_position, self._cam_lookat, up_direction)
         
         tsdf_obj.integrate(color_image, depth_image, self._cam_intrinsics, cam_pose_matrix, obs_weight=2.)
-        tsdf_vol_cpu, _ = tsdf_obj.get_volume()
-        tsdf_vol_cpu = np.transpose(tsdf_vol_cpu, [1, 0, 2]) # swap x-axis and y-axis to make it consitent with scene_tsdf
+        # tsdf_vol_cpu, _ = tsdf_obj.get_volume()
+        # tsdf_vol_cpu = np.transpose(tsdf_vol_cpu, [1, 0, 2]) # swap x-axis and y-axis to make it consitent with scene_tsdf
         # tsdf2mesh(tsdf_vol_cpu, 'scene.obj', skip_z=3)
         return tsdf_obj
     

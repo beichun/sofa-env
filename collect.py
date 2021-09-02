@@ -21,8 +21,6 @@ parser.add_argument('--n_object', default=1, type=int)
 parser.add_argument('--object_category',  default='primitive')
 parser.add_argument('--n_env',  default=1, type=int)
 parser.add_argument('--n_sample',  default=10, type=int)
-# parser.add_argument('--grasp_succ_only', action='store_true')
-# parser.add_argument('--grasp_fail_only', action='store_true')
 parser.add_argument('--joint_sample_range', default=10., type=float)
 
 
@@ -45,7 +43,6 @@ def main():
     finished_q = ctx.Queue(args.n_sample)
     processes = []
     for i in range(args.n_env):
-        
         p = ctx.Process(target=sim_collect,
                         args=(args.gui,
                               args.n_object,
@@ -119,11 +116,8 @@ def sim_collect(gui, n_object, object_category, gripper_id, joint_sample_range, 
 
 def sample(bbox, joint_limit, joint_sample_range):
     xy = np.random.uniform(bbox[0], bbox[1])
-    r = 2*np.pi*np.random.rand()
-
-    joint_states = np.random.uniform(joint_limit[0], joint_limit[1]*joint_sample_range)
-    return xy, r, joint_states
-
+    joint_states = np.random.uniform(joint_limit[0]*joint_sample_range, joint_limit[1]*joint_sample_range)
+    
 def dump_result(result, save_dir):
     # save dataset
     save_keys = ['gripper_init_pc', 'gripper_final_pc', 'gripper_target_pc', 'scene_init_pc', 'scene_final_pc',

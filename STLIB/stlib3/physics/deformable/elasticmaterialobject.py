@@ -56,6 +56,8 @@ class ElasticMaterialObject(Sofa.Prefab):
             mesh = meshio.read(self.volumeMeshFileName.value)
             import numpy as np
             points = mesh.points
+            # scale
+            points *= self.scale.value
             # rotate
             rot = R.from_euler('xyz', self.rotation.value, degrees=True)
             points = rot.apply(points)

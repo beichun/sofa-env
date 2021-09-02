@@ -53,9 +53,9 @@ class Sim(object):
         # observation
         self._voxel_size = 0.002
         self._heightmap_pix_size = self._voxel_size
-        self._tsdf_bounds = np.array([[-0.24, 0.24], # 3x2 rows: x,y,z cols: min,max
-                                      [-0.24, 0.24],
-                                      [ 0.0, 0.24]])
+        self._tsdf_bounds = np.array([[-0.3, 0.3], # 3x2 rows: x,y,z cols: min,max
+                                      [-0.3, 0.3],
+                                      [ 0.0, 0.3]])
         self._cam_lookat = self._tsdf_bounds.mean(axis=1)
         self._cam_image_size = (512, 512)
         self._cam_z_near = 0.01
@@ -192,7 +192,6 @@ class Sim(object):
             # 1. move objects away
             object_init_states = self.get_object_states()
             self.set_object_states()
-            print(object_init_states)
             
             # 2. step gripper, get target
             self._gripper.step_pose(pose)
@@ -647,7 +646,6 @@ class Sim(object):
                 x, y, z = state[0]
                 sofa_pos = [x*self._unit_scale, y*self._unit_scale, z*self._unit_scale]
                 quat = state[1]
-                print('set', [sofa_pos + quat])
                 self._sofa_object_list[i].mstate.position = [sofa_pos + quat]
             else:
                 self._bullet_client.resetBasePositionAndOrientation(self._pybullet_object_list[i], state[0], state[1])

@@ -51,6 +51,7 @@ def main():
                               args.n_object,
                               args.object_category,
                               args.gripper_id,
+                              args.joint_sample_range/10.,
                               args.data_dir,
                               i,
                               task_q,
@@ -72,7 +73,7 @@ def main():
                 p.terminate()
             break
         
-def sim_collect(gui, n_object, object_category, gripper_id, data_dir, env_idx, task_queue, finished_queue):
+def sim_collect(gui, n_object, object_category, gripper_id, joint_sample_range, data_dir, env_idx, task_queue, finished_queue):
     
     env = Sim(gui)
     
@@ -86,19 +87,22 @@ def sim_collect(gui, n_object, object_category, gripper_id, data_dir, env_idx, t
             obs1 = env.reset(n_object,
                             object_category,
                             gripper_id=gripper_id,
-                            gripper_size=.8,
+                            gripper_size=.6,
                             object_size='random')
             # env.runSofa()
         except RuntimeError as e:
             print(f'RuntimeError encountered in seed {seed} reset.')
             continue
         
+        # sample pose action
+        bbox = obs1['object_bbox']
         joint_limit = obs1['gripper_joint_limit']
-        xy = obs1['object_bbox'].mean(0)
+        xy, rot, joint_states = sample(bbox, joint_limit, joint_sample_range)
+        
         z = obs1['get_z'](xy[0], xy[1])
-        pose = [xy[0], xy[1], z, 0]
+        pose = [xy[0], xy[1], z, rot]
         try:
-            r, obs2 = env.step(pose, obs1['gripper_joint_limit'][1], True)
+            r, obs2 = env.step(pose, joint_states, True)
         except RuntimeError as e:
             print(f'RuntimeError encountered in seed {seed} step.')
             continue
@@ -113,6 +117,12 @@ def sim_collect(gui, n_object, object_category, gripper_id, data_dir, env_idx, t
         if finished_queue.full():
             break
 
+def sample(bbox, joint_limit, joint_sample_range):
+    xy = np.random.uniform(bbox[0], bbox[1])
+    r = 2*np.pi*np.random.rand()
+
+    joint_states = np.random.uniform(joint_limit[0], joint_limit[1]*joint_sample_range)
+    return xy, r, joint_states
 
 def dump_result(result, save_dir):
     # save dataset

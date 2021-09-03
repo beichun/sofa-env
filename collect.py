@@ -116,8 +116,11 @@ def sim_collect(gui, n_object, object_category, gripper_id, joint_sample_range, 
 
 def sample(bbox, joint_limit, joint_sample_range):
     xy = np.random.uniform(bbox[0], bbox[1])
-    joint_states = np.random.uniform(joint_limit[0]*joint_sample_range, joint_limit[1]*joint_sample_range)
-    
+    r = 2*np.pi*np.random.rand() - np.pi
+
+    joint_states = np.random.uniform(joint_limit[0], joint_limit[1]*joint_sample_range)
+    return xy, r, joint_states
+
 def dump_result(result, save_dir):
     # save dataset
     save_keys = ['gripper_init_pc', 'gripper_final_pc', 'gripper_target_pc', 'scene_init_pc', 'scene_final_pc',

@@ -89,7 +89,7 @@ class Sim(object):
         
         # sofa related
         self._unit_scale = 1000
-        self._sofa_dt = 0.004
+        self._sofa_dt = 0.002
         SofaRuntime.importPlugin("SofaComponentAll")
         self._sofa_root = None
         # location used to export gripper meshes from sofa
@@ -293,7 +293,7 @@ class Sim(object):
         self._floor = RigidObject(parent=self._sofa_root,
                                     name="Floor",
                                     uniformScale=1.,
-                                    surfaceMeshFileName="assets/floor-trimesh1.obj",
+                                    surfaceMeshFileName="assets/floor/floor.obj",
                                     translation=[0.0,0.0,0],
                                     rotation=[0.0,0.0,0.0],
                                     inertiaMatrix=[1.0,0.0,0.0,0.0,1.0,0.0,0.0,0.0,1.0],

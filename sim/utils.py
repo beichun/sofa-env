@@ -328,7 +328,8 @@ class OBJ(object):
             self.vnormals[self.faces[:, 1], :] += N
             self.vnormals[self.faces[:, 2], :] += N
         row_norms = np.linalg.norm(self.vnormals, axis=1)
-        self.vnormals = (self.vnormals.T / row_norms).T
+        with np.errstate(divide='ignore',invalid='ignore'):
+            self.vnormals = (self.vnormals.T / row_norms).T
 
     def write(self, file_name):
         faces = self.faces + 1

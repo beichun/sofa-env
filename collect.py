@@ -3,6 +3,7 @@ import argparse
 import multiprocessing as mp
 import os
 import shutil
+import json
 
 import numpy as np
 import h5py
@@ -95,7 +96,8 @@ def sim_collect(gui, n_object, object_category, gripper_id, joint_sample_range, 
         bbox = obs1['object_bbox']
         joint_limit = obs1['gripper_joint_limit']
         xy, rot, joint_states = sample(bbox, joint_limit, joint_sample_range)
-        
+        # print(bbox)
+        # print(xy)
         z = obs1['get_z'](xy[0], xy[1], grasp_offset=0.03)
         pose = [xy[0], xy[1], z, rot]
         try:
@@ -103,7 +105,11 @@ def sim_collect(gui, n_object, object_category, gripper_id, joint_sample_range, 
         except RuntimeError as e:
             print(f'RuntimeError encountered in seed {seed} step.')
             continue
-        sim_result = {**obs1, **obs2}
+        sim_result = {
+            **obs1,
+            **obs2,
+            'pose': np.array(pose),
+            'joint_states': joint_states}
         
         sample_dir = os.path.join(data_dir, str(seed))
         os.mkdir(sample_dir)
@@ -135,7 +141,13 @@ def dump_result(result, save_dir):
     for k in mesh_keys:
         mesh_path = os.path.join(save_dir, f'{k}_mesh.ply')
         meshwrite(mesh_path, *result[k+'_tsdf'].get_mesh(skip_z=3))
-        
+    
+    # save .json
+    json_path = os.path.join(save_dir, f'info.json')
+    json_keys = ['object_bbox', 'gripper_joint_limit', 'pose', 'joint_states']
+    json_dict = { key: result[key].tolist() for key in json_keys }
+    with open(json_path, 'w+') as f:
+        json.dump(json_dict, f, indent=4)
     # meshwrite('mesh_scene_init.ply', *obs1['scene_init_tsdf'].get_mesh(skip_z=3))
     
 

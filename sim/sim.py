@@ -151,7 +151,7 @@ class Sim(object):
             return max(z, 0)
         observation = {
             'scene_init_pc': scene_observation['pc'],
-            'scene_init_tsdf': scene_observation['tsdf'],
+            'scene_init_mesh': scene_observation['mesh'],
             'object_bbox': scene_observation['bbox'],
             'get_z': partial(get_z,
                              tsdf_bounds=self._tsdf_bounds,
@@ -179,10 +179,10 @@ class Sim(object):
                 self.sofa2pybullet()
             obs = self.get_gripper_observation()
             observation['gripper_final_pc'] = obs['pc']
-            observation['gripper_final_tsdf'] = obs['tsdf']
+            observation['gripper_final_mesh'] = obs['mesh']
             obs = self.get_scene_observation()
             observation['scene_final_pc'] = obs['pc']
-            observation['scene_final_tsdf'] = obs['tsdf']
+            observation['scene_final_mesh'] = obs['mesh']
             # additional information
             observation['action_final'] = self._gripper.get_joint_states()
         # 3. move up gripper, get reward
@@ -201,7 +201,7 @@ class Sim(object):
                 self.sofa2pybullet()
             obs = self.get_gripper_observation()
             observation['gripper_init_pc'] = obs['pc']
-            observation['gripper_init_tsdf'] = obs['tsdf']
+            observation['gripper_init_mesh'] = obs['mesh']
             observation['action_init'] = self._gripper.get_joint_states()
             observation['action_target'] = joints
             
@@ -211,7 +211,7 @@ class Sim(object):
                 self.sofa2pybullet()
             obs = self.get_gripper_observation()
             observation['gripper_target_pc'] = obs['pc']
-            observation['gripper_target_tsdf'] = obs['tsdf']        
+            observation['gripper_target_mesh'] = obs['mesh']        
         
         return reward, observation
         
@@ -579,7 +579,7 @@ class Sim(object):
         bbox_max = np.max(scene_pc[:, :2], axis=0)
         return {
             'pc': scene_pc,
-            'tsdf': scene_tsdf,
+            'mesh': scene_tsdf.get_mesh(skip_z=3),
             'bbox': np.stack([bbox_min, bbox_max], axis=0)
         }
     
@@ -597,7 +597,7 @@ class Sim(object):
             self._bullet_client.changeVisualShape(self._pybullet_object_list[i], object_colors[i][1], rgbaColor=object_colors[i][7])
         return {
             'pc': gripper_pc,
-            'tsdf': gripper_tsdf
+            'mesh': gripper_tsdf.get_mesh(skip_z=3)
         }
     
     def get_object_states(self):

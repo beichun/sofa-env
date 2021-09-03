@@ -140,7 +140,7 @@ def dump_result(result, save_dir):
     mesh_keys = ['gripper_init', 'gripper_final', 'gripper_target', 'scene_init', 'scene_final']
     for k in mesh_keys:
         mesh_path = os.path.join(save_dir, f'{k}_mesh.ply')
-        meshwrite(mesh_path, *result[k+'_tsdf'].get_mesh(skip_z=3))
+        meshwrite(mesh_path, *result[k+'_mesh'])
     
     # save .json
     json_path = os.path.join(save_dir, f'info.json')

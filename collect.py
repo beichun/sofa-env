@@ -84,7 +84,7 @@ def sim_collect(gui, n_object, object_category, gripper_id, joint_sample_range, 
             obs1 = env.reset(n_object,
                             object_category,
                             gripper_id=gripper_id,
-                            gripper_size=.6,
+                            gripper_size=1.,
                             object_size='random')
             # env.runSofa()
         except RuntimeError as e:
@@ -96,7 +96,7 @@ def sim_collect(gui, n_object, object_category, gripper_id, joint_sample_range, 
         joint_limit = obs1['gripper_joint_limit']
         xy, rot, joint_states = sample(bbox, joint_limit, joint_sample_range)
         
-        z = obs1['get_z'](xy[0], xy[1])
+        z = obs1['get_z'](xy[0], xy[1], grasp_offset=0.03)
         pose = [xy[0], xy[1], z, rot]
         try:
             r, obs2 = env.step(pose, joint_states, True)

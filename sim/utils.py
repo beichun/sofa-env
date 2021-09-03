@@ -317,7 +317,8 @@ class OBJ(object):
         N = np.cross(self.vertices[self.faces[:, 0], :] - self.vertices[self.faces[:, 1], :], self.vertices[self.faces[:, 0], :] - self.vertices[self.faces[:, 2], :])
         row_norms = np.linalg.norm(N, axis=1)
         self.fareas = 0.5 * row_norms
-        N = (N.T / row_norms).T
+        with np.errstate(divide='ignore',invalid='ignore'):
+            N = (N.T / row_norms).T
         self.fnormals = N
 
     def cal_vnormals(self, force=False):

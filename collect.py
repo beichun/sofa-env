@@ -19,9 +19,10 @@ parser.add_argument('--overwrite', action='store_true')
 parser.add_argument('--gui', action='store_true')
 parser.add_argument('--gripper_id', default=['articulated'], nargs='+')
 parser.add_argument('--n_object', default=1, type=int)
-parser.add_argument('--object_category',  default='primitive')
-parser.add_argument('--n_env',  default=1, type=int)
-parser.add_argument('--n_sample',  default=10, type=int)
+parser.add_argument('--object_category', default='primitive')
+parser.add_argument('--n_env', default=1, type=int)
+parser.add_argument('--seed', default=None, type=int)
+parser.add_argument('--n_sample', default=10, type=int)
 parser.add_argument('--joint_sample_range', default=10., type=float)
 
 
@@ -40,7 +41,10 @@ def main():
     
     ctx = mp.get_context('spawn')
     task_q = ctx.Queue()
-    [task_q.put(query) for query in range(args.n_sample*5)]
+    if args.seed is None:
+        [task_q.put(query) for query in range(args.n_sample*5)]
+    else:
+        [task_q.put(args.seed) for _ in range(args.n_sample*5)]
     finished_q = ctx.Queue(args.n_sample)
     processes = []
     for i in range(args.n_env):

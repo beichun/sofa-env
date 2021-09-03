@@ -14,7 +14,7 @@ __pycache__/
 assets/object/3dnet
 # *.urdf
 *.mtl
-*.json
+# *.json
 *.txt
 
 data/
